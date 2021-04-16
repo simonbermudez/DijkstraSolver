@@ -19,26 +19,31 @@
         <label for="problemJSON">Graph JSON (list representation):</label><br>
         <textarea id="problemJSON" cols="70" rows="10" onchange="renderStartNodeSelect()">
 {
-    "a": {"e":1, "b":1, "g":3},
-    "b": {"c":3},
-    "c": {"d":4},
-    "d": {"e":7},
-    "e": {"a":8},
-    "f": {"h":11},
-    "g": {"f":12},
-    "h": {"f":14}
+    "A": {"T": 80, "N": 30},
+    "T": {"J": 50, "R": 15, "G":10},
+    "J": {},
+    "R": {"J": 20},
+    "G": {"R": 45, "E": 5},
+    "E": {"T": 8, "R": 15},
+    "N": {"T": 42, "G": 25, "E": 32}
 }
         </textarea>
         <label for="startNodeSelect">Starting Node:</label>
         <select id="startNodeSelect">
-            <option value="a">a</option>
-            <option value="b">b</option>
-            <option value="c">c</option>
-            <option value="d">d</option>
-            <option value="e">e</option>
-            <option value="f">f</option>
-            <option value="g">g</option>
-            <option value="h">h</option>
+            <option value="A">A</option>
+            <option value="E">E</option>
+            <option value="G">G</option>
+            <option value="J">J</option>
+            <option value="N">N</option>
+            <option value="R">R</option>
+            <option value="T">T</option>
+        </select>
+        <label for="startNodeSelect">Order: </label>
+        <select id="processingOrder">
+            <option value="alpha">alpha</option>
+            <option value="alpha-reverse">alpha-reverse</option>
+            <option value="distance-min-max">distance-min-max</option>
+            <option value="distance-max-min">distance-max-min</option>
         </select>
         <button onClick="calculate()" class="btn btn-primary">Calculate!</button>
     </div>
@@ -62,15 +67,14 @@
     <script type="text/javascript">
 
         var problem = {
-            "a": { "e": 1, "b": 1, "g": 3 },
-            "b": { "c": 3 },
-            "c": { "d": 4 },
-            "d": { "e": 7 },
-            "e": { "a": 8 },
-            "f": { "h": 11 },
-            "g": { "f": 12 },
-            "h": { "f": 14 }
-        }
+                "A": {"T": 80, "N": 30},
+                "T": {"J": 50, "R": 15, "G":10},
+                "J": {},
+                "R": {"J": 20},
+                "G": {"R": 45, "E": 5},
+                "E": {"T": 8, "R": 15},
+                "N": {"T": 42, "G": 25, "E": 32}
+            }
 
         function calculate() {
             problem = JSON.parse($("#problemJSON").val())
@@ -78,19 +82,99 @@
             renderGraph();
 
             var start = $("#startNodeSelect").val();
-            var solutions = solve(problem, start);
+            var solutions = solveDijkstras(problem, start);
 
             var solutionHTML = $("#solutions")
             solutionHTML.html("");
-            solutionHTML.append(`From '${start}' to<br>`);
+            solutionHTML.append(`<b>Dijstra's</b> From '${start}' to<br>`);
             //display solutions
             for (var s in solutions) {
                 if (!solutions[s]) continue;
                 solutionHTML.append(" -> " + s + ": [" + solutions[s].join(", ") + "]   (dist:" + solutions[s].dist + ")<br>");
             }
+
+            var processingOrder = $("#processingOrder").val();
+            
+
+            solutionHTML.append(`<br>Breadth First Search (BFS): <br><b> -> ${bfs(problem, start, processingOrder).join(", ")}</b></br> `);
+            solutionHTML.append(`<br>Depth First Search (DFS): <br><b> -> ${dfs(problem, start, processingOrder).join(", ")}</b></br> `);
+
         }
 
-        function solve(graph, s) {
+        function bfs(graph, start, processingOrder) {
+            var solution = []
+            var allNodes = Object.keys(graph)
+            var visitedNodes = []
+            var queue = [start]
+            while (queue && solution.length != allNodes.length) {
+                currentNode = queue.shift()
+                if (processingOrder == "alpha") {
+                    adjacentNodes = Object.keys(graph[currentNode]).sort()
+                } else if(processingOrder == "alpha-reverse") {
+                    adjacentNodes = Object.keys(graph[currentNode]).sort().reverse()
+                } else if (processingOrder == "distance-min-max") {
+                    adjacentNodes = Object.keys(Object.entries(graph[currentNode])
+                                        .sort(([,a],[,b]) => a-b)
+                                        .reduce((r, [k, v]) => ({ ...r, [k]: v }), {}));
+                } else if (processingOrder == "distance-max-min") {
+                    adjacentNodes = Object.keys(Object.entries(graph[currentNode])
+                                        .sort(([,a],[,b]) => a-b)
+                                        .reduce((r, [k, v]) => ({ ...r, [k]: v }), {})).reverse();
+                }
+
+                for (adjacentNode of adjacentNodes) {
+                    if (!visitedNodes.includes(adjacentNode)) {
+                        queue.push(adjacentNode)
+                    }
+                }
+                if (!visitedNodes.includes(currentNode)) {
+                    solution.push(currentNode) 
+                    visitedNodes.push(currentNode)
+                }
+                
+            }
+            return solution;
+        }
+
+        function dfs(graph, start, processingOrder) {
+            var solution = []
+            var allNodes = Object.keys(graph)
+            var visitedNodes = []
+            var stack = [start]
+            while (stack && solution.length != allNodes.length) {
+                currentNode = stack.pop()
+                if (processingOrder == "alpha") {
+                    adjacentNodes = Object.keys(graph[currentNode]).sort().reverse()
+                } else if(processingOrder == "alpha-reverse") {
+                    adjacentNodes = Object.keys(graph[currentNode]).sort()
+                } else if (processingOrder == "distance-min-max") {
+                    adjacentNodes = Object.keys(Object.entries(graph[currentNode])
+                                        .sort(([,a],[,b]) => a-b)
+                                        .reduce((r, [k, v]) => ({ ...r, [k]: v }), {})).reverse()
+                } else if (processingOrder == "distance-max-min") {
+                    adjacentNodes = Object.keys(Object.entries(graph[currentNode])
+                                        .sort(([,a],[,b]) => a-b)
+                                        .reduce((r, [k, v]) => ({ ...r, [k]: v }), {}))
+                }
+                
+                console.log(adjacentNodes);
+                console.log(stack);
+
+                for (adjacentNode of adjacentNodes) {
+                    if (!visitedNodes.includes(adjacentNode)) {
+                        stack.push(adjacentNode)
+                    }
+                }
+                if (!visitedNodes.includes(currentNode)) {
+                    solution.push(currentNode) 
+                    visitedNodes.push(currentNode)
+                }
+                               
+            }
+            return solution;
+        }
+
+        function solveDijkstras(graph, s) {
             var solutions = {};
             solutions[s] = [];
             solutions[s].dist = 0;
